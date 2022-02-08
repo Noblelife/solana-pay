@@ -16,9 +16,17 @@ Mobile wallets should ideally register to handle the URL scheme and provide a se
 
 By standardizing a simple approach to solving those problems, we ensure compatibility of applications and wallets.
 
-## Specification
-```
-solana:<recipient>?amount=<amount>&label=<label>&message=<message>&memo=<memo>&reference=<reference>
+## Specification: Transfer Request
+
+A Solana Pay transfer request URL describes a non-interactive SOL or SPL token transfer request.
+```html
+solana:<recipient>
+      ?amount=<amount>
+      &spl-token=<spl-token>
+      &reference=<reference>
+      &label=<label>
+      &message=<message>
+      &memo=<memo>
 ```
 
 ### Recipient
@@ -62,25 +70,85 @@ A single `memo` field is allowed as an optional query parameter. The value must 
 
 Wallets should display the memo to the user. The SPL Memo instruction must be included immediately before the SOL or SPL Token transfer instruction to avoid ambiguity with other instructions in the transaction.
 
-## Examples
-URL describing a transfer for 1 SOL:
+### Examples
+
+##### URL describing a transfer request for 1 SOL.
 ```
-solana:mvines9iiHiQTysrwkJjGf2gb9Ex9jXJX8ns3qwf2kN?amount=1&label=Michael&message=Thanks%20for%20all%20the%20fish&memo=OrderId1234
+solana:mvines9iiHiQTysrwkJjGf2gb9Ex9jXJX8ns3qwf2kN?amount=1&label=Michael&message=Thanks%20for%20all%20the%20fish&memo=OrderId12345
 ```
 
-URL describing a transfer for 0.01 USDC
+##### URL describing a transfer request for 0.01 USDC.
 ```
-solana:mvines9iiHiQTysrwkJjGf2gb9Ex9jXJX8ns3qwf2kN?amount=0.01&spl-token=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&label=Michael&message=Thanks%20for%20all%20the%20fish&memo=OrderId5678
+solana:mvines9iiHiQTysrwkJjGf2gb9Ex9jXJX8ns3qwf2kN?amount=0.01&spl-token=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
 ```
 
-URL describing a generic SOL transfer. The user must be prompted for the exact amount.
+##### URL describing a transfer request for SOL. The user must be prompted for the amount.
 ```
-solana:mvines9iiHiQTysrwkJjGf2gb9Ex9jXJX8ns3qwf2kN&label=Michael&memo=4321ABCD
+solana:mvines9iiHiQTysrwkJjGf2gb9Ex9jXJX8ns3qwf2kN&label=Michael
+```
+
+## Specification: Link Request
+
+A Solana Pay link request URL describes an interactive Solana transaction request.
+```html
+solana:<link>
+```
+
+### Link
+A single `link` field is required as the pathname. The value must be a non-encoded, absolute HTTPS URL, or the wallet must reject it as malformed.
+
+The wallet should prompt the user to make a request to the URL. The wallet must make an HTTP `POST` JSON request to the URL with a body of
+```html
+{"from":"<from>"}
+```
+
+The `from` field value must be the base58-encoded public key of a native SOL account of the wallet.
+
+The wallet must handle HTTP [client error](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status#client_error_responses), [server error](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status#server_error_responses), and [redirect responses](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status#redirection_messages).
+
+The server may respond with these, or with an HTTP `OK` JSON response with a body of
+```html
+{"transaction":"<transaction>"}
+```
+
+The `transaction` field value must be a base64-encoded [serialized transaction](https://solana-labs.github.io/solana-web3.js/classes/Transaction.html#serialize). The wallet must base65-decode the transaction and [deserialize it](https://solana-labs.github.io/solana-web3.js/classes/Transaction.html#from).
+
+If the transaction does not have a [fee payer](https://solana-labs.github.io/solana-web3.js/classes/Transaction.html#feePayer) or [recent blockhash](https://solana-labs.github.io/solana-web3.js/classes/Transaction.html#recentBlockhash) provided, the wallet must provide them. If the transaction has [signatures](https://solana-labs.github.io/solana-web3.js/classes/Transaction.html#signatures) provided, the user's signature may or may not be required.
+
+The wallet should prompt the user to approve the transaction. If the user approves the transaction, the wallet must sign it, if the user's signature is required, and send it.
+
+### Example
+
+##### URL describing a link request.
+```
+solana:https://merchant.com/solana-pay/order/12345
+```
+
+#### Request
+```
+POST /solana-pay/order/12345 HTTP/1.1
+Host: merchant.com
+Connection: close
+Accept: application/json
+Content-Type: application/json
+Content-Length: 54
+
+{"from":"mvines9iiHiQTysrwkJjGf2gb9Ex9jXJX8ns3qwf2kN"}
+```
+
+#### Response
+```
+HTTP/1.1 200 OK
+Connection: close
+Content-Type: application/json
+Content-Length: 400
+
+{"transaction":"AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAECC4JMKqNplIXybGb/GhK1ofdVWeuEjXnQor7gi0Y2hMcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADlz4zDCm4MfP8sOSTdO2NA4j0EKI+Tr8jMoUFA2770DAQECAAAMAgAAAAAAAAAAAAAA/GhK1ofdVWeuEjXnQor7gi0Y2hMcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAuCTCqjaZSF8mxm/xoStaH3VVnrhI150KK+4ItGNoTHAQECAAAMAgAAAAAAAAAAAAAA"}
 ```
 
 ## Extensions
 
-Additional fields may be incorporated into this specification to enable new use cases while ensuring compatibility with apps and wallets.
+Additional formats and fields may be incorporated into this specification to enable new use cases while ensuring compatibility with apps and wallets.
 
 Please open a Github issue to propose changes to the specification and solicit feedback from application and wallet developers.
 
